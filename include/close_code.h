@@ -1,0 +1,3 @@
+#undef DDB_API
+#undef DDB_INLINE
+#undef DDB_FORCE_INLINE

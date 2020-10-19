@@ -40,7 +40,6 @@ function removeIfExists(path)
     end
 end
 
-
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 srcdir = "%{prj.location}/src"
 
@@ -60,6 +59,7 @@ newaction {
             removeIfExists(path.join(_path, "Makefile"))
             removeIfExists(path.join(_path, "bin"))
             removeIfExists(path.join(_path, "bin-int"))
+            removeIfExists(path.join(_path, "ddb.make"))
         end
         print("finished cleaning the project")
     end
@@ -86,8 +86,18 @@ project "ddb"
         "tclstub8.6"
     }
     files {
-        "generic/*.c"
+        "generic/*.c",
+        "include/**.h"
     }
+    targetdir (targetdir_prefix)
+    objdir (objdir_prefix)
+    includedirs {
+        "include"
+    }
+
+-- Platform
+filter "system:windows"
+    defines "DDB_EXPORT_DLL"
 
 -- Compiler
 filter "toolset:gcc"
@@ -98,6 +108,12 @@ filter "not toolset:gcc"
 
 filter "configurations:Debug"
     defines {
-        "PD_DEBUG"
+        "DDB_DEBUG"
     }
     symbols "on"
+
+filter "configurations:Release"
+    defines {
+        "PD_RELEASE"
+    }
+    optimize "on"
