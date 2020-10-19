@@ -30,4 +30,7 @@ typedef struct PointerObj {
 
 #include "close_code.h"
 
+void* Ddb_Alloc(size_t size, size_t count);
+void* Ddb_Realloc(void* ptr, size_t size, size_t count);
+
 #endif /* MEMORY_H */
