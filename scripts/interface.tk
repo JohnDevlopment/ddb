@@ -1,0 +1,182 @@
+#!/usr/bin/env wish
+# Tcl/Tk interface that uses the ddb module
+
+package require jdebug
+
+jdebug::on
+
+proc echo args {
+    puts [concat {*}$args]
+}
+
+proc replaceEntryText {widget text} {
+    $widget state !readonly
+    $widget delete 0 end
+    $widget insert 0 $text
+    $widget state readonly
+}
+
+proc listCommandOptions {cmd args} {
+    set dOptions [dict create]
+    foreach e $args {
+        dict append dOptions "-$e" [{*}$cmd "-$e"]
+    }
+
+    return $dOptions
+}
+
+proc getTraitsFromItem {} {
+    global dTraits
+    set item [.fr1.trEntries selection]
+    if {$item == ""} return
+
+    set key [lindex [.fr1.trEntries item $item -values] 1]
+    set lTraits [dict get $dTraits $key]
+    .fr2.lbTitle configure -text $key
+
+    foreach trait {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley} \
+        e $lTraits \
+    {
+        set widget .fr2.en$trait
+        replaceEntryText $widget 
+    }
+
+    return
+}
+
+# Increments VARNAME, returning its old value.
+proc pincr {varName {val 1}} {
+    upvar $varName Var
+    set temp $Var
+    incr Var $val
+    return $temp
+}
+
+# Used to validate entries.
+proc validateEntryKey {widget curStr insertStr action index} {
+    set remapCommand [list $widget configure -validate key]
+
+    if {$action == 1} {
+        # disallow pastes
+        if {[string length $insertStr] > 1} {return false}
+
+        # insert '-'
+        if {$insertStr == "-"} {
+            # exclude character because it's already in
+            # '-' only allowed on index zero
+            if {[string first "-" $curStr] >= 0} {
+                return false
+            } else {
+                if {$index != 0} {
+                    $widget insert 0 -
+                    after idle $remapCommand
+                    return false
+                }
+            }
+        } else {
+            # insert digit or bust
+            set maxChars 3
+            if {[string first "-" $curStr] >= 0} {incr maxChars}
+
+            if {! [string is digit $insertStr] || [string length $curStr] >= $maxChars} {
+                return false
+            }
+        }
+    }
+
+    return true
+}
+
+# Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley
+set dTraits [dict create Angie "0 0 0 0 0 0 0 0 0 27" Loyla "0 0 0 0 0 0 0 0 0 27"]
+
+wm title . {DDB Interface}
+wm geometry . 640x480+30+30
+
+font create TitleFont -family Helvetica -size 16
+
+ttk::frame .fr1 -relief groove -borderwidth 1
+ttk::frame .fr2 -relief groove -borderwidth 1
+
+# Tree widget
+ttk::treeview .fr1.trEntries -height 10 -columns {CElement CName COffset} -displaycolumns {0 1} \
+    -show headings -selectmode browse
+
+bind .fr1.trEntries <Double-1> {+
+    getTraitsFromItem
+}
+
+# Column headers
+.fr1.trEntries heading "#1" -text Element
+.fr1.trEntries heading "#2" -text Name
+
+# Columns
+.fr1.trEntries column "#1" -width 95  -minwidth 98 -anchor w
+.fr1.trEntries column "#2" -width 305 -minwidth 300 -anchor w
+
+.fr1.trEntries insert {} end -values {Lightning Angie 0}
+.fr1.trEntries insert {} end -values {Darkness Loyla 16}
+
+# Title of entry
+ttk::label .fr2.lbTitle -font TitleFont
+set FR2_LBTITLE "Test"
+
+# Subtitle
+ttk::label .fr2.lbSub -text "Traits Goal"
+
+# padding: x y ix iy
+proc temp_buildOptions {wgt row col padding {sticky w}} {
+    set length [llength $padding]
+
+    if {$length < 4} {
+        lappend padding {*}[lrepeat [expr "4 - $length"] 0]
+    } elseif {$length > 4} {
+        set padding [lreplace $padding 4 end]
+    }
+
+    lassign $padding x y ix iy
+
+    return [list grid $wgt -row $row -column $col -padx $x -pady $y -ipadx $ix -pady $iy -sticky $sticky]
+}
+
+set padding 2
+set row 2
+set col 0
+
+set lCommands [list]
+
+foreach trait {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley} \
+{
+    set widget1 [ttk::label .fr2.lb$trait -text $trait]
+    set widget2 [ttk::entry .fr2.en$trait -width 4 -validate key -state readonly \
+        -validatecommand [list validateEntryKey %W %s %S %d %i]]
+    lappend lCommands [temp_buildOptions $widget1 $row $col {1 1 0 0}] \
+        [temp_buildOptions $widget2 [expr $row + 1] $col {1 1 2 0} ew]
+
+    if {[incr row 2] > 9} {
+        set row 2
+        incr col
+    }
+}
+
+bind TEntry <Double-1> {
+    %W state !readonly
+}
+
+# Free memory
+rename temp_buildOptions {}
+unset row col padding trait
+after idle {unset lCommands e}
+
+pack .fr1 .fr2 -side left -fill both -expand true
+
+pack .fr1.trEntries -fill both -expand true
+
+grid .fr2.lbTitle - -
+grid .fr2.lbSub - -
+
+foreach e $lCommands {
+    eval $e
+}
+
+grid columnconfigure .fr2 all -weight 1
