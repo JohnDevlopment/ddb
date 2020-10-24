@@ -3,8 +3,10 @@
 #include "ddbstring.h"
 #include "memory.h"
 #include "ddbcommand.h"
+#include "stringcommand.h"
 
 static int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
+static int DdbCommand_String(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
 
 /* Minimum required Tcl version as a string. */
 static const char* minTclVersion = "8.6";
@@ -16,6 +18,8 @@ static const char* tclVersion = NULL;
 
 /* Custom Tcl value type structure. */
 static Tcl_ObjType tclBlockType;
+
+#define DdbDeleteProc_String DdbDeleteProc_Ddb
 
 static void DdbDeleteProc_Ddb(ClientData cd)
 {
@@ -52,6 +56,15 @@ int Ddb_Init(Tcl_Interp* interp)
         return TCL_ERROR;
     }
 
+    strcpy(commandName, "_string");
+    DdbCommand = Tcl_CreateObjCommand(interp, commandName, DdbCommand_String,
+        (ClientData) Ddb_AllocString(NULL, 50), DdbDeleteProc_String);
+    if (! DdbCommand)
+    {
+        DDB_EPRINTF("failed to create object command\n");
+        return TCL_ERROR;
+    }
+
     DDB_TRACE_PRINTF("Tcl version %s; load module ddb. Command is ddb. 'ddb list' for a list of subcommands.\n",
         tclVersion);
 
@@ -59,6 +72,47 @@ int Ddb_Init(Tcl_Interp* interp)
 }
 
 /* Internal functions */
+
+int DdbCommand_String(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
+{
+    const char* subcommand;
+    long int hash;
+
+    if (objc < 2)
+    {
+        DDB_SET_STRING_RESULT(interp, DDB_SUBCOMMAND_WRONG_ARG_MESSAGE("_string"));
+        return TCL_ERROR;
+    }
+
+    /* Subcommand: cap its length to 30 characters. */
+    subcommand = Tcl_GetStringFromObj(objv[1], NULL);
+    if (strlen(subcommand) > 30)
+    {
+        DDB_SET_STRING_RESULT(interp, "invalid 'subcommand' argument: exceeds 30 character cap");
+        return TCL_ERROR;
+    }
+
+    hash = (long) Ddb_Hash(subcommand);
+
+    switch (hash)
+    {
+        case 0x377C42B34F62E8C: /* charcount */
+            return DDB_JUMP_SUBCOMMAND(String, Charcount);
+
+        default:
+        {
+            const SString fmt = Ddb_NewSString("unknown or ambiguous subcommand \"%s\": must be charcount");
+            DString* dstr = (DString*) cd;
+            /* FMT length - 2 (replacing "%s") + SUBCOMMAND length + 1. */
+            dstr = Ddb_AllocStringIfNeeded(dstr, fmt.length + strlen(subcommand) - 1);
+            sprintf(dstr->ptr, fmt.ptr, subcommand);
+            DDB_SET_STRING_RESULT(interp, dstr->ptr);
+            break;
+        }
+    }
+
+    return TCL_ERROR;
+}
 
 int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
 {
@@ -92,7 +146,7 @@ int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const o
 
         default:
         {
-            const SString fmt = Ddb_NewSString("unknown or ambiguous subcommand \"%s\": must be hash");
+            const SString fmt = Ddb_NewSString("unknown or ambiguous subcommand \"%s\": must be hash list");
             DString* dstr = (DString*) cd;
             /* FMT length - 2 (replacing "%s") + SUBCOMMAND length + 1. */
             dstr = Ddb_AllocStringIfNeeded(dstr, (size_t) fmt.length + strlen(subcommand) - 1);

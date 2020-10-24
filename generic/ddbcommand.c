@@ -7,6 +7,7 @@ int DdbSubcommand_Hash(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
 {
     Tcl_Obj* result = NULL;
     SString param;
+    int length;
 
     if (objc != 1)
     {
@@ -15,12 +16,13 @@ int DdbSubcommand_Hash(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
     }
 
     /* Retrieve string. */
-    param.ptr = Tcl_GetStringFromObj(objv[0], &param.length);
-    if (! param.ptr || param.length < 1)
+    param.ptr = Tcl_GetStringFromObj(objv[0], &length);
+    if (! param.ptr || length < 1)
     {
         DDB_SET_STRING_RESULT(interp, "invalid string argument passed to ddb hash");
         return TCL_ERROR;
     }
+    param.length = (size_t) length;
 
     {
         /* Calculate hash of string. Place it in long value. */
@@ -33,7 +35,6 @@ int DdbSubcommand_Hash(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
             result->bytes = DDB_ALLOC(char, 17);
             sprintf(result->bytes, "0x%lx", temp);
             result->length = (int) strlen(result->bytes);
-            DDB_TRACE_PRINTF("length of resulting string: %d\n", result->length);
         }
     }
 

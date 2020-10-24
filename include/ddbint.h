@@ -70,7 +70,6 @@ DDB_REALLOC - Reallocate a block of memory
 /* Sets the result of INTERP with the type specified in TYPE. Accepts a pointer to the value. */
 void Ddb_SetResult(Tcl_Interp* interp, enum TclValueType type, const void* ptr);
 
-
 #include "close_code.h"
 
 #endif /* DDB_INT_H */

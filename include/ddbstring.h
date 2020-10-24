@@ -8,14 +8,15 @@
 
 /* A dyamic string structure. */
 typedef struct DString {
-    char* ptr;
-    int   length;
+    char*  ptr;
+    size_t length;
+    size_t capacity;
 } DString;
 
 /* A simple structure to represent a static string. */
 typedef struct SString {
     const char* ptr;
-    int         length;
+    size_t      length;
 } SString;
 
 /* String functions */
@@ -26,10 +27,19 @@ DString* Ddb_AllocString(DString* ptr, size_t size);
 /* Allocate a dynamic string on the condition that it needs allocation. */
 DDB_FORCE_INLINE DString* Ddb_AllocStringIfNeeded(DString* ptr, size_t size)
 {
-    return (! ptr || ptr->length < (int) size) ? Ddb_AllocString(ptr, size) : ptr;
+    return (! ptr  || ptr->capacity < size) ? Ddb_AllocString(ptr, size) : ptr;
 }
 
-/* Free the string and any data inside of it. */
+/* Sets the string to zero length and also zeroes out the string. Does not free the string. */
+void Ddb_ClearString(DString* ptr);
+
+/* Sets the string value to STR. */
+void Ddb_SetString(DString* ptr, const char* str);
+
+/* Appends a string to STR. The string is reallocated if it's not big enough to contain STR. */
+void Ddb_AppendString(DString* ptr, const char* str);
+
+/* Frees PTR and the string inside it. PTR is invalid after this call. */
 void Ddb_FreeString(DString* ptr);
 
 /* Create static string object. */
@@ -37,6 +47,9 @@ SString Ddb_NewSString(const char* str);
 
 /* Returns the hash value of STR. Uses the k = 33 algorithm. */
 unsigned long int Ddb_Hash(const char* str);
+
+/* Counts all instances of a character in the string STR. */
+size_t Ddb_strchrcnt(const char* str, int c);
 
 #include "close_code.h"
 

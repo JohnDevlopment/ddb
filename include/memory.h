@@ -30,7 +30,17 @@ typedef struct PointerObj {
 
 #include "close_code.h"
 
+/* Allocates a pointer of COUNT elements, each SIZE bytes. */
 void* Ddb_Alloc(size_t size, size_t count);
+
+/* Use this to reallocate memory in PTR, COUNT elements of SIZE bytes each. */
 void* Ddb_Realloc(void* ptr, size_t size, size_t count);
+
+/* Frees the pointer PTR. */
+#ifdef DDB_DEBUG
+void Ddb_Free(void* ptr);
+#else
+DDB_FORCE_INLINE void Ddb_Free(void* ptr) { free(ptr); }
+#endif
 
 #endif /* MEMORY_H */

@@ -51,15 +51,6 @@ DDB_API int Ddb_Init(Tcl_Interp* interp);
     #define DDB_ASSERT(x, ...)
 #endif
 
-/* Allocate a block of memory and initialize it to zero. */
-void* Ddb_Alloc(size_t size, size_t count);
-
-/* Reallocate a block of memory, either growing or shrinking the block. New memory is unitialized. */
-void* Ddb_Realloc(void* ptr, size_t size, size_t count);
-
-/* Frees the pointer PTR. */
-DDB_FORCE_INLINE void Ddb_Free(void* ptr) { ckfree(ptr); }
-
 #include "close_code.h"
 
 #ifdef __cplusplus
