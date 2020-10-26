@@ -3,17 +3,93 @@
 
 package require jdebug
 
+#load [file join [pwd] "libddb.so"]
+#load [file join [file join [pwd] scripts] "ddbblock.tcl"]
+
+package require ddbblock
+
 jdebug::on
+
+proc _linsert {listVar index args} {
+    upvar $listVar Var
+    set Var [linsert $Var $index {*}$args]
+}
+
+# Unsets a list of variables without the risk of errors
+proc _unset args {
+    set command {
+        if {[info exists $var]} {
+            jdebug::print "delete $var"
+            unset $var
+        }
+    }
+
+    foreach var $args {
+        uplevel [subst -nocommands $command]
+    }
+}
+
+# Execute a list of commands
+proc execCmdList cmdList {
+    foreach e $cmdList {
+        uplevel $e
+    }
+}
+
+# TODO: Add timer class
+proc Timer args {
+    jdebug::print "Timer command args: [concat $args]"
+    return
+}
 
 proc echo args {
     puts [concat {*}$args]
 }
 
+proc hashGetDialog {} {
+    set dlg .hashDialog
+
+    set hideCommand "wm withdraw $dlg"
+    set showCommand "wm deiconify $dlg"
+
+    if {! [winfo exists $dlg]} {
+        # First creation
+        toplevel $dlg -class Dialog
+        wm transient $dlg .
+        wm title $dlg "Print Hash"
+
+        # Pack widgets
+        pack [ttk::frame $dlg.frEntry] -fill both
+        pack [ttk::entry $dlg.frEntry.enToken -width 20 \
+            -validatecommand "EntryValidations::Preval::Text_NoSpaces_Length %W %s %S %d %i %P" \
+            -validate key]
+        pack [ttk::button $dlg.frEntry.btSubmit -text Submit -command [subst -nocommands {
+            set temp [$dlg.frEntry.enToken get]
+            puts "hash of \\\$temp : [ddb hash \$temp]"
+            unset temp
+            eval $hideCommand
+        }]]
+    } else {
+        eval $showCommand
+        $dlg.frEntry.enToken delete 0 end
+    }
+
+    focus $dlg.frEntry.enToken
+
+    return
+}
+
+# Replaces the text currently in $widget
+# Warning: the text inserted is NOT validated!
 proc replaceEntryText {widget text} {
+    set temp [$widget cget -validate]
+
+    $widget configure -validate none
     $widget state !readonly
     $widget delete 0 end
     $widget insert 0 $text
     $widget state readonly
+    $widget configure -validate $temp
 }
 
 proc listCommandOptions {cmd args} {
@@ -26,19 +102,18 @@ proc listCommandOptions {cmd args} {
 }
 
 proc getTraitsFromItem {} {
-    global dTraits
+    global Traits TraitNames
+
+    uplevel "#0" {set SelectedWidget ""}
+
     set item [.fr1.trEntries selection]
     if {$item == ""} return
 
     set key [lindex [.fr1.trEntries item $item -values] 1]
-    set lTraits [dict get $dTraits $key]
     .fr2.lbTitle configure -text $key
 
-    foreach trait {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley} \
-        e $lTraits \
-    {
-        set widget .fr2.en$trait
-        replaceEntryText $widget 
+    foreach trait $TraitNames e [dict get $Traits $key] {
+        replaceEntryText .fr2.en$trait $e
     }
 
     return
@@ -52,13 +127,48 @@ proc pincr {varName {val 1}} {
     return $temp
 }
 
+# Unselects the widget, stopping the timer and disabling the widget
+proc unselectEntry widget {
+    set command [list "$widget state readonly" "Timer stop"]
+    tailcall execCmdList $command
+}
+
+# Selects the widget, starting a new timer and enabling the widget to be modified
+proc selectEntry widget {
+    set command [list "$widget state !readonly" "Timer start {15 seconds}"]
+    tailcall execCmdList $command
+}
+
 # Used to validate entries.
-proc validateEntryKey {widget curStr insertStr action index} {
+proc validateEntryKey {widget curStr insertStr action index newStr} {
     set remapCommand [list $widget configure -validate key]
 
     if {$action == 1} {
-        # disallow pastes
-        if {[string length $insertStr] > 1} {return false}
+        set length [string length $insertStr]
+
+        # Pasting text into the widget
+        if {$length > 1} {
+            set newStr ""
+
+            # Append each character that passes the test
+            for {set i 0} {$i < $length} {incr i} {
+                set c [string index $insertStr $i]
+
+                # Allow hyphen if it's the first one and at index 0
+                # or if the character is a valid digit
+                if {($c eq "-" && $i == 0 && $index == 0) || [string is digit $c]} {
+                    append newStr $c
+                }
+            }
+
+            # Modify widget text
+            if {$newStr != ""} {
+                replaceEntryText $widget $newStr
+                after idle "unselectEntry $widget"
+            }
+
+            return false
+        }
 
         # insert '-'
         if {$insertStr == "-"} {
@@ -87,13 +197,31 @@ proc validateEntryKey {widget curStr insertStr action index} {
     return true
 }
 
-# Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley
-set dTraits [dict create Angie "0 0 0 0 0 0 0 0 0 27" Loyla "0 0 0 0 0 0 0 0 0 27"]
+package require widgets
+
+set SelectedWidget ""
+
+set TraitNames {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley}
+set Traits [dict create \
+    Angie "27 0 0 0 0 0 0 0 0 27" \
+    Loyla "0 27 0 0 0 0 0 0 0 27" \
+    Firagal "0 0 27 0 0 0 0 0 0 27" \
+    Silvera "0 0 0 24 0 0 0 0 0 27" \
+    "Pew-Pew" "0 0 0 0 25 0 0 0 0 27"]
 
 wm title . {DDB Interface}
 wm geometry . 640x480+30+30
 
 font create TitleFont -family Helvetica -size 16
+
+# Create menubar
+set sMainMenu [MenuBar new .menubar]
+$sMainMenu add menubutton mbFile mnFile File
+$sMainMenu add menucommand 0 Exit exit
+$sMainMenu add separator 0
+
+$sMainMenu add menubutton mbCmd mnCmd Commands
+$sMainMenu add menucommand 1 {Get Hash} hashGetDialog
 
 ttk::frame .fr1 -relief groove -borderwidth 1
 ttk::frame .fr2 -relief groove -borderwidth 1
@@ -116,6 +244,9 @@ bind .fr1.trEntries <Double-1> {+
 
 .fr1.trEntries insert {} end -values {Lightning Angie 0}
 .fr1.trEntries insert {} end -values {Darkness Loyla 16}
+.fr1.trEntries insert {} end -values {Fire Firagal 32}
+.fr1.trEntries insert {} end -values {Water Silvera 48}
+.fr1.trEntries insert {} end -values {Light Pew-Pew 64}
 
 # Title of entry
 ttk::label .fr2.lbTitle -font TitleFont
@@ -145,11 +276,11 @@ set col 0
 
 set lCommands [list]
 
-foreach trait {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd Eager Smiley} \
+foreach trait $TraitNames \
 {
     set widget1 [ttk::label .fr2.lb$trait -text $trait]
     set widget2 [ttk::entry .fr2.en$trait -width 4 -validate key -state readonly \
-        -validatecommand [list validateEntryKey %W %s %S %d %i]]
+        -validatecommand [list validateEntryKey %W %s %S %d %i %P]]
     lappend lCommands [temp_buildOptions $widget1 $row $col {1 1 0 0}] \
         [temp_buildOptions $widget2 [expr $row + 1] $col {1 1 2 0} ew]
 
@@ -160,13 +291,22 @@ foreach trait {Sparkly Relaxed Valiant Dizzy Friendly Aspiring Resolute Shrewd E
 }
 
 bind TEntry <Double-1> {
-    %W state !readonly
+    # Unselect the previous widget
+    if {$SelectedWidget != ""} {
+        $SelectedWidget state readonly
+    }
+
+    # Select this widget for edit
+    %W instate readonly {
+        %W state !readonly
+        Timer start {15 seconds} script
+        set SelectedWidget %W
+    }
 }
 
-# Free memory
-rename temp_buildOptions {}
-unset row col padding trait
-after idle {unset lCommands e}
+bind TEntry <Return> {
+    unselectEntry %W
+}
 
 pack .fr1 .fr2 -side left -fill both -expand true
 
@@ -175,8 +315,10 @@ pack .fr1.trEntries -fill both -expand true
 grid .fr2.lbTitle - -
 grid .fr2.lbSub - -
 
-foreach e $lCommands {
-    eval $e
-}
+execCmdList $lCommands
+
+# Free memory
+rename temp_buildOptions {}
+unset row col padding trait lCommands
 
 grid columnconfigure .fr2 all -weight 1

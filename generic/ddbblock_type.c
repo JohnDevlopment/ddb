@@ -68,6 +68,7 @@ void DdbBlock_FreeInternalRepProc(register Tcl_Obj* objPtr)
 
     BLOCK_INT_REP(objPtr).ptr   = NULL;
     BLOCK_INT_REP(objPtr).value = 0;
+    objPtr->typePtr = NULL;
 }
 
 void DdbBlock_StringUpdateProc(register Tcl_Obj* objPtr)
