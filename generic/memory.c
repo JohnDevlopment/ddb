@@ -1,6 +1,5 @@
 #include "ddb.h"
 #include "ddbint.h"
-#include "memory.h"
 
 #include <string.h>
 
@@ -12,7 +11,7 @@ void* Ddb_Alloc(size_t size, size_t count)
         return NULL;
 
     /* Allocate and initialize memory. */
-    ptr = (count > 1) ? calloc(count, size) : malloc(size);
+    ptr = ckalloc(size * count);
     DDB_ASSERT(ptr, "ran out of memory\n");
     if (ptr)
         memset(ptr, 0, size * count);
@@ -30,16 +29,16 @@ void* Ddb_Realloc(void* ptr, size_t size, size_t count)
     if (! size || ! count)
         return NULL;
 
-    /* Reallocate pointer. */
-    result = realloc(ptr, size * count);
-    DDB_ASSERT(result, "ran out of memory\n");
+    /* Allocate pointer. */
+    if (! ptr)
+        return Ddb_Alloc(size, count);
 
-    return result;
-}
+    /* Reallocate pointer. */
+    result = ckrealloc(ptr, size * count);
+    DDB_ASSERT(ptr, "ran out of memory\n");
 
 #ifdef DDB_DEBUG
 void Ddb_Free(void* ptr)
 {
     free(ptr);
 }
-#endif

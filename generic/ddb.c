@@ -6,7 +6,6 @@
 #include "ddbblock_type.h"
 
 static int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
-static int DdbCommand_String(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
 
 const char* const DdbEmptyString = "";
 
