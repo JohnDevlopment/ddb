@@ -40,7 +40,6 @@ void* Ddb_Realloc(void* ptr, size_t size, size_t count)
 #ifdef DDB_DEBUG
 void Ddb_Free(void* ptr)
 {
-    printf("Free memory at %p\n", ptr);
     free(ptr);
 }
 #endif

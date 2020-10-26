@@ -28,8 +28,6 @@ typedef struct PointerObj {
     PointerObjType type;
 } PointerObj;
 
-#include "close_code.h"
-
 /* Allocates a pointer of COUNT elements, each SIZE bytes. */
 void* Ddb_Alloc(size_t size, size_t count);
 
@@ -42,5 +40,7 @@ void Ddb_Free(void* ptr);
 #else
 DDB_FORCE_INLINE void Ddb_Free(void* ptr) { free(ptr); }
 #endif
+
+#include "close_code.h"
 
 #endif /* MEMORY_H */

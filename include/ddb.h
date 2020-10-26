@@ -22,6 +22,8 @@ extern "C" {
 
 #include "begin_code.h"
 
+#define DDB_FILE_ID 0x42424470
+
 /*
 ==================================================
 struct: DDB_FileHeader
@@ -37,6 +39,9 @@ typedef struct DDB_FileHeader {
     uint64_t columnSize;
     uint64_t offset;
 } DDB_FileHeader;
+
+/* An empty string. */
+DDB_API const char* const DdbEmptyString;
 
 /* Initializes the extension API. Called automatically by Tcl's `load` command. */
 DDB_API int Ddb_Init(Tcl_Interp* interp);

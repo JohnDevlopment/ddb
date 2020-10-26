@@ -108,7 +108,8 @@ filter "not toolset:gcc"
 
 filter "configurations:Debug"
     defines {
-        "DDB_DEBUG"
+        "DDB_DEBUG",
+        "TCL_MEM_DEBUG"
     }
     symbols "on"
 
