@@ -5,6 +5,26 @@
 #include "ddbblock_type.h"
 #include "memory.h"
 
+#include <stdbool.h>
+
+static int CheckObjectType(register Tcl_Obj* objPtr, enum DdbBlockType prefType)
+{
+    uint16_t objType;
+
+    if (objPtr->typePtr != Ddb_GetObjType())
+        return false;
+
+    objType = DDB_LOWORD(BLOCK_INT_REP(objPtr).value);
+
+    if (prefType != DDB_ANY)
+    {
+        if (objType != (uint16_t) prefType)
+            return false;
+    }
+
+    return true;
+}
+
 int DdbSubcommand_Hash(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
 {
     Tcl_Obj* result = NULL;
@@ -57,7 +77,7 @@ int DdbSubcommand_Init(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
 
     /* Allocate block. */
     /*block = (DDB_FileHeader*) Tcl_Alloc(sizeof(DDB_FileHeader));*/
-    block = DDB_TCL_ALLOC(DDB_FileHeader, 1);
+    block = DDB_ALLOC(DDB_FileHeader, 1);
     if (! block)
     {
         DDB_SET_STRING_RESULT(interp, "failed to allocate pointer");
@@ -85,44 +105,139 @@ int DdbSubcommand_Init(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
     return TCL_OK;
 }
 
-#if 0
-int DdbSubcommand_Free(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
+int DdbSubcommand_Columns(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
 {
-    Tcl_Obj* obj;
-    DDB_FileHeader* block;
+    Tcl_Obj* headObj, **elements, *result;
+    DDB_ColumnHeader* columns;
+    int length, code;
+
+    if (objc != 2)
+    {
+        DDB_SUBCOMMAND_WRONG_ARGS("fileHeader columns");
+        return TCL_ERROR;
+    }
+
+    headObj = objv[0];
+
+    /* Invalid block type. */
+    if (! CheckObjectType(headObj, DDB_FILE_HEADER))
+    {
+        DDB_SET_STRING_RESULT(interp, "first argument is not a valid file header");
+        return TCL_ERROR;
+    }
+
+    /* Extrapolate list elements from argument 2. */
+    code = Tcl_ListObjGetElements(interp, objv[1], &length, &elements);
+
+    if (code != TCL_OK)
+        return TCL_ERROR;
+
+    /* Zero-length list. */
+    if (! length)
+    {
+        DDB_SET_STRING_RESULT(interp, "zero length list argument");
+        return TCL_ERROR;
+    }
+
+    /* Object result with the column headers. */
+    columns = DDB_ALLOC(DDB_ColumnHeader, length);
+    result  = Tcl_NewObj();
+
+    BLOCK_INT_REP(result).ptr   = columns;
+    BLOCK_INT_REP(result).value = DDB_PACK_DWORD(length, DDB_COLUMN_HEADER);
+
+    result->typePtr = Ddb_GetObjType();
+    DDB_ASSERT(result->typePtr, "null type pointer\n");
+    Tcl_IncrRefCount(result);
+
+    /* Extract elements from list argument. */
+    for (int i = 0; i < length; ++i)
+    {
+        Tcl_Obj** subelements; /* Each element is itself a list, hence subelements. */
+        int sublen; /* Length of each sublist. */
+
+        /* Attempt to extrapolate elements from this sublist. */
+        code = Tcl_ListObjGetElements(interp, elements[i], &sublen, &subelements);
+        if (code != TCL_OK) break;
+
+        /* Error if not exactly 3 count. */
+        if (sublen != 3)
+        {
+            DDB_PRINTF_RESULT(interp, "malformed list; sublist %d must be 3 elements", i);
+            return TCL_ERROR;
+        }
+
+        strncpy(columns[i].name, Tcl_GetStringFromObj(subelements[i], NULL), sizeof(columns[i].name));
+        {
+            int temp_int;
+            const char* temp_str = Tcl_GetStringFromObj(subelements[2], NULL);
+            code = Tcl_GetIntFromObj(interp, subelements[1], &temp_int);
+            if (code != TCL_OK) break;
+            columns[i].length = (uint32_t) temp_int;
+            columns[i].type = *temp_str;
+        }
+    }
+
+    /* Update file header based on the columns. */
+    Ddb_UpdateFileHeader(DDB_STATIC_CAST(DDB_FileHeader*, BLOCK_INT_REP(headObj).ptr),
+        columns, length);
+
+    if (code == TCL_OK)
+    {
+        Tcl_SetObjResult(interp, result);
+        Tcl_DecrRefCount(result);
+        Tcl_InvalidateStringRep(result);
+    }
+
+    return code;
+}
+
+int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
+{
+    DDB_DWord ddbTypeValue;
 
     if (objc != 1)
     {
-        /*DDB_SET_STRING_RESULT(interp, DDB_COMMAND_WRONG_ARG_MESSAGE("ddb init obj"));*/
-        DDB_SUBCOMMAND_WRONG_ARGS("obj");
+        DDB_SUBCOMMAND_WRONG_ARGS("ddb print val");
         return TCL_ERROR;
     }
 
-    obj = objv[0];
-
-    /* Not a block. */
-    if (obj->typePtr != Ddb_GetObjType())
+    if (! CheckObjectType(objv[0], DDB_ANY))
     {
-        DDB_SET_STRING_RESULT(interp, "argument is not a ddb block");
+        DDB_SET_STRING_RESULT(interp, "first argument is not a valid ddb block");
         return TCL_ERROR;
     }
 
-    /* Not a valid block type. */
-    if (obj->internalRep.ptrAndLongRep.value != DDB_FILE_HEADER)
-    {
-        DDB_SET_STRING_RESULT(interp, "invalid block type\n");
-        return TCL_ERROR;
-    }
+    DDB_UNPACK_DWORD(ddbTypeValue, BLOCK_INT_REP(objv[0]).value);
 
-    DDB_TRACE_PRINTF("DdbSubcommand_Free: refcount = %d\n", obj->refCount);
-    Tcl_DecrRefCount(obj);
-    DDB_TRACE_PRINTF("DdbSubcommand_Free: refcount = %d\n", obj->refCount);
-    if (! obj->refCount)
+    switch (ddbTypeValue.lo)
     {
-        DDB_TRACE_PRINTF("string obj");
-        Tcl_SetStringObj(obj, DdbEmptyString, -1);
+        case DDB_FILE_HEADER:
+        {
+            DDB_FileHeader* temp_ptr = (DDB_FileHeader*) BLOCK_INT_REP(objv[0]).ptr;
+            printf("number of entries: %u\nblock size: %u\nnumber of columns: %u\n",
+                temp_ptr->numEntries, temp_ptr->blockSize, temp_ptr->numColumns);
+            printf("offset to first entry: %u\n", temp_ptr->offset);
+            break;
+        }
+
+        case DDB_COLUMN_HEADER:
+        {
+            DDB_ColumnHeader* temp_ptr = (DDB_ColumnHeader*) BLOCK_INT_REP(objv[0]).ptr;
+            char buffer[50];
+            for (uint16_t i = 0; i < ddbTypeValue.hi; ++i)
+            {
+                strcpy(buffer, temp_ptr[i].name);
+                printf("column %u\nname: %s\nlength: %u bytes\ntype: %c\n\n",
+                    i, buffer, temp_ptr[i].length, temp_ptr[i].type);
+            }
+            break;
+        }
+
+        default:
+            DDB_SET_STRING_RESULT(interp, "unknown object type");
+            return TCL_ERROR;
     }
 
     return TCL_OK;
 }
-#endif

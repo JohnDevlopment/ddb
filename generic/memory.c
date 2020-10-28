@@ -37,8 +37,12 @@ void* Ddb_Realloc(void* ptr, size_t size, size_t count)
     result = ckrealloc(ptr, size * count);
     DDB_ASSERT(ptr, "ran out of memory\n");
 
+    return result;
+}
+
 #ifdef DDB_DEBUG
 void Ddb_Free(void* ptr)
 {
-    free(ptr);
+    ckfree(ptr);
 }
+#endif

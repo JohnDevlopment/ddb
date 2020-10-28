@@ -26,7 +26,7 @@ void DdbBlock_DupIntRepProc(Tcl_Obj* srcPtr, register Tcl_Obj* dupPtr)
     {
         case DDB_FILE_HEADER:
             blksize = sizeof(DDB_FileHeader);
-            BLOCK_INT_REP(dupPtr).ptr = DDB_TCL_ALLOC(DDB_FileHeader, 1);
+            BLOCK_INT_REP(dupPtr).ptr = DDB_ALLOC(DDB_FileHeader, 1);
             break;
 
         case DDB_COLUMN_HEADER:
@@ -53,14 +53,12 @@ void DdbBlock_DupIntRepProc(Tcl_Obj* srcPtr, register Tcl_Obj* dupPtr)
 
 void DdbBlock_FreeInternalRepProc(register Tcl_Obj* objPtr)
 {
-    DDB_TRACE_PRINT_FUNCTION();
-
     switch (BLOCK_INT_REP(objPtr).value)
     {
         case DDB_FILE_HEADER:
-            ckfree(BLOCK_INT_REP(objPtr).ptr);
         case DDB_COLUMN_HEADER:
         case DDB_RECORD:
+            ckfree(BLOCK_INT_REP(objPtr).ptr);
             break;
 
         default: break;
@@ -73,11 +71,8 @@ void DdbBlock_FreeInternalRepProc(register Tcl_Obj* objPtr)
 
 void DdbBlock_StringUpdateProc(register Tcl_Obj* objPtr)
 {
-    const char* prefix = NULL;
     char name[50];
     size_t len;
-
-    DDB_TRACE_PRINT_FUNCTION();
 
     /* Format a string with */
     sprintf(name, "DDBBlock0x%lx", (unsigned long) BLOCK_INT_REP(objPtr).ptr);

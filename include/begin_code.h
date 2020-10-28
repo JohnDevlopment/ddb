@@ -32,6 +32,7 @@
     #endif
 #endif
 
+/* Forces a function to be inlined. */
 #ifndef DDB_FORCE_INLINE
     #if ((defined(__GNUC__) && (__GNUC__ >= 4))) || defined(__clang__)
         #define DDB_FORCE_INLINE __attribute__((always_inline)) static __inline__
@@ -39,5 +40,24 @@
         #define DDB_FORCE_INLINE __forceinline
     #else
         #define DDB_FORCE_INLINE static PD_INLINE
+    #endif
+#endif
+
+/* Force structure packing at 4 byte alignment. */
+#if defined(_MSC_VER) || defined(__MWERKS__) || defined(__BORLANDC__)
+    #ifdef _MSC_VER
+        #pragma warning(disable: 4103)
+    #endif
+    #ifdef __clang__
+        #pragma clang diagnostic ignored "-Wpragma-pack"
+    #endif
+    #ifdef __BORLANDC__
+        #pragma nopackwarning
+    #endif
+    /* Alignment based on architecture. */
+    #if defined(DDB_ARCH_X86_64)
+        #pragma pack(push, 8)
+    #else
+        #pragma pack(push, 4)
     #endif
 #endif

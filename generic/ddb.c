@@ -15,8 +15,6 @@ static const char* minTclVersion = "8.6";
 /* Actual Tcl version. */
 static const char* tclVersion = NULL;
 
-#define DdbDeleteProc_String DdbDeleteProc_Ddb
-
 static void DdbDeleteProc_Ddb(ClientData cd)
 {
     Ddb_FreeString((DString*) cd);
@@ -48,7 +46,9 @@ int Ddb_Init(Tcl_Interp* interp)
     DDB_TRACE_PRINTF("Tcl version %s; load module ddb. Command is ddb. 'ddb list' for a list of subcommands.\n",
         tclVersion);
 
-    Tcl_PkgProvide(interp, "ddb", "0.1");
+    DDB_TRACE_PRINTF("Size of DDB_FileHeader: %lu\n", sizeof(DDB_FileHeader));
+
+    Tcl_PkgProvide(interp, "ddb", "0.2");
 
     return TCL_OK;
 }
@@ -78,18 +78,21 @@ int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const o
 
     switch (hash)
     {
-        /*case 0x17C96F087:*/ /* "free" */
-            /*return DDB_JUMP_SUBCOMMAND(Ddb, Free);*/
-
         case 0x17C97C2C9L: /* "hash" */
             return DDB_JUMP_SUBCOMMAND(Ddb, Hash);
 
         case 0x17C988539L: /* "init" */
             return DDB_JUMP_SUBCOMMAND(Ddb, Init);
 
+        case 0xD0B1D35616E6: /* "columns" */
+            return DDB_JUMP_SUBCOMMAND(Ddb, Columns);
+
+        case 0x31102a0912: /* "print" */
+            return DDB_JUMP_SUBCOMMAND(Ddb, Print);
+
         default:
         {
-            const SString fmt = Ddb_NewSString("unknown or ambiguous subcommand \"%s\": must be free hash init");
+            const SString fmt = Ddb_NewSString("unknown or ambiguous subcommand \"%s\": must be columns hash init print");
             DString* dstr = (DString*) cd;
             /* FMT length - 2 (replacing "%s") + SUBCOMMAND length + 1. */
             dstr = Ddb_AllocStringIfNeeded(dstr, (size_t) fmt.length + strlen(subcommand) - 1);

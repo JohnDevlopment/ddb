@@ -36,7 +36,7 @@ void* Ddb_Realloc(void* ptr, size_t size, size_t count);
 #ifdef DDB_DEBUG
 void Ddb_Free(void* ptr);
 #else
-DDB_FORCE_INLINE void Ddb_Free(void* ptr) { free(ptr); }
+DDB_FORCE_INLINE void Ddb_Free(void* ptr) { ckfree(ptr); }
 #endif
 
 #include "close_code.h"

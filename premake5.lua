@@ -72,7 +72,7 @@ newaction {
 }
 
 workspace "Dewpsi Database"
-    configurations { "Debug", "Release" }
+    configurations { "Debug64", "Debug32", "Release64", "Release32" }
 
 project "ddb"
     kind "SharedLib"
@@ -80,7 +80,6 @@ project "ddb"
     defines {
         "USE_TCL_STUBS"
     }
-    architecture "x64"
     flags "MultiProcessorCompile"
     links {
         "tclstub8.6"
@@ -99,6 +98,18 @@ project "ddb"
 filter "system:windows"
     defines "DDB_EXPORT_DLL"
 
+filter "system:windows"
+    defines "DDB_EXPORT_DLL"
+
+-- Architecture
+filter "configurations:*32"
+    architecture "x86"
+    defines "DDB_ARCH_X86"
+
+filter "configurations:*64"
+    architecture "x86_64"
+    defines "DDB_ARCH_X86_64"
+
 -- Compiler
 filter "toolset:gcc"
     cdialect "gnu11"
@@ -106,14 +117,15 @@ filter "toolset:gcc"
 filter "not toolset:gcc"
     cdialect "C11"
 
-filter "configurations:Debug"
+-- Configurations
+filter "configurations:Debug*"
     defines {
         "DDB_DEBUG",
         "TCL_MEM_DEBUG"
     }
     symbols "on"
 
-filter "configurations:Release"
+filter "configurations:Release*"
     defines {
         "PD_RELEASE"
     }

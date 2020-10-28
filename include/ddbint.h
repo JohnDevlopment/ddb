@@ -7,7 +7,7 @@
 
 enum TclValueType;
 
-enum DdbBlockType { DDB_FILE_HEADER, DDB_COLUMN_HEADER, DDB_RECORD };
+enum DdbBlockType { DDB_FILE_HEADER, DDB_COLUMN_HEADER, DDB_RECORD, DDB_ANY };
 
 /* Helper macros */
 
@@ -36,47 +36,6 @@ DDB_JUMP_SUBCOMMAND - Call subcommand
 #define DDB_JUMP_SUBCOMMAND(cmd, subcmd) cmd##Subcommand_##subcmd(cd, interp, objc - 2, objv + 2)
 
 /*
-DDB_ALLOC - Allocate a block of memory
-    This function returns a pointer to a block of memory that's large enough to hold
-    COUNT instances of TYPE in continguous memory. If it returns NULL, that means no memory
-    block large enough could be found.
-*/
-#define DDB_ALLOC(type, count) (type *) Ddb_Alloc(sizeof(type), count)
-
-/*
-DDB_TCL_ALLOC - Allocate a block of memory using Tcl_Alloc
-    This function returns a pointer to a block of memory that holds COUNT instances
-    of TYPE in continguous memory. If it returns NULL, that means no memory was allocated.
-*/
-#define DDB_TCL_ALLOC(type, count) (type *) Tcl_Alloc(sizeof(type) * count)
-
-/*
-DDB_REALLOC - Reallocate a block of memory
-    Reallocate a block of memory using P as the source block. COUNT elements of type TYPE
-    are allocated. Memory is carried over from the source block as far as it can fit in the
-    new block of data. If the returned pointer points to an area of memory that's larger than
-    the old one, the new memory is not initialized.
-*/
-#define DDB_REALLOC(p, type, count) (type *) Ddb_Realloc(p, sizeof(type), count)
-
-/*
-DDB_ARRAY_SIZE - Returns the size of an array
-    Returns the number of elements in an array of static duration. This works because, when
-    a static array is passed to sizeof, it returns the total size of the array, whereas
-    sizeof(array[0]) returns the size of an individual element, which is the size of the underlying
-    type.
-*/
-#define DDB_ARRAY_SIZE(array)       (sizeof(array) / sizeof(array[0]))
-
-#if 0
-#define DDB_SUBCOMMAND_WRONG_ARG_MESSAGE(cmd) \
-    "wrong # args: should be " cmd " subcommand ?arg ...?"
-
-#define DDB_COMMAND_WRONG_ARG_MESSAGE(cmdline) \
-    "wrong # args: should be " cmdline
-#endif
-
-/*
 DDB_SUBCOMMAND_WRONG_ARGS - Generate a "wrong argument" error
     Generates an error message indicating the wrong number of arguments for a subcommand. It calls
     Tcl_WrongNumArgs which generates the standard "wrong # args" messages you're use to seeing.
@@ -101,6 +60,12 @@ DDB_SET_STRING_RESULT - Set string result for interpreter
         SString setStringResultStruct = Ddb_NewSString(str); \
         Ddb_SetResult(interp, DDB_TCL_STRING, (void*) &setStringResultStruct); \
     } while(0)
+
+#define DDB_PRINTF_RESULT(interp, ...) \
+    do { \
+        Tcl_Obj* ddbPrintfResultPtr = Tcl_ObjPrintf(__VA_ARGS__); \
+        Tcl_SetObjResult(interp, ddbPrintfResultPtr); \
+    } while (0)
 
 #if 0
 #define DDB_SET_INT_RESULT(interp, val) \

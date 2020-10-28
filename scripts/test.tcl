@@ -2,9 +2,10 @@
 load "./libddb.so"
 
 set fileheader [ddb init]
+set colheader [ddb columns $fileheader {{Name 30 S} {Element 1 S}}]
 
-set fileheaderCopy $fileheader
+puts "File header"
+ddb print $fileheader
 
-unset fileheader
-after 2000
-unset fileheaderCopy
+puts "\nColumns"
+ddb print $colheader
