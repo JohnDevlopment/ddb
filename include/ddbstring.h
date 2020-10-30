@@ -39,6 +39,15 @@ void Ddb_SetString(DString* ptr, const char* str);
 /* Appends a string to STR. The string is reallocated if it's not big enough to contain STR. */
 void Ddb_AppendString(DString* ptr, const char* str);
 
+/*
+Ddb_CopyString - Copy a string
+    Copies a maximum of MAXLEN characters from SRC into the internal string
+    located in DST. DST shall be large enough to hold MAXLEN characters. If
+    MAXLEN is negative, Ddb_CopyString copies the entire string in SRC up to the first
+    terminating NULL character.
+*/
+void Ddb_CopyString(DString* dst, const char* src, int maxlen);
+
 /* Frees PTR and the string inside it. PTR is invalid after this call. */
 void Ddb_FreeString(DString* ptr);
 

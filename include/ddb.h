@@ -13,11 +13,13 @@ was created by John Russell.
     #include <cstdio>
     #include <cstdlib>
     #include <cstdint>
+    #include <cstddef>
 extern "C" {
 #else
     #include <stdio.h>
     #include <stdlib.h>
     #include <stdint.h>
+    #include <stddef.h>
 #endif /* defined(__cplusplus) */
 
 #include "begin_code.h"
@@ -67,6 +69,20 @@ typedef enum DDB_FieldType {
     DDB_TYPE_INTEGER = 'I',
     DDB_TYPE_DOUBLE  = 'D'
 } DDB_FieldType;
+
+/*
+==================================================
+struct: DDB_Record
+Contains the actual data of the record. Its size
+is completely dependent on on what the column.
+==================================================
+*/
+typedef struct DDB_Record {
+    char     deleted;
+    uint32_t structSize;
+    uint32_t blockSize;
+    char     data[];
+} DDB_Record;
 
 /* An empty string. */
 DDB_API const char* const DdbEmptyString;
@@ -122,6 +138,9 @@ typedef struct DDB_DWord {
 /* Casts the expression EXP to the given type TYPE. */
 #define DDB_STATIC_CAST(type, exp) ((type)(exp))
 
+/* Casts the expression EXP to the given type TYPE, adding or removing const status. */
+#define DDB_CONST_CAST(type, exp) ((type)(exp))
+
 /* Packs two 16-bit values a 32-bit value. */
 #define DDB_PACK_DWORD(hi, lo) (uint32_t)((uint16_t)(hi) << 16 | (uint16_t)(lo))
 
@@ -130,6 +149,15 @@ typedef struct DDB_DWord {
 
 /* Retrieve the low word of a 32 bit value. */
 #define DDB_LOWORD(dw) ((uint16_t)(dw))
+
+/* Returns the offset to a member of a struct or union. */
+#define DDB_OFFSETOF(type, member) offsetof(type, member)
+
+
+
+#define DDB_SIZEOF_MEMBER(type, member) (size_t)(sizeof(((type*)0)->member))
+
+
 
 /*
 DDB_UNPACK_DWORD - Unpacks a 32-bit value into its components

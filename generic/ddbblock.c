@@ -1,6 +1,8 @@
 #include "ddbblock.h"
 #include "ddbint.h"
 
+#include <string.h>
+
 void Ddb_InitFileHeader(DDB_FileHeader* p)
 {
     p->id         = DDB_FILE_ID;
@@ -14,7 +16,6 @@ void Ddb_UpdateFileHeader(DDB_FileHeader* headPtr, const DDB_ColumnHeader* colPt
 {
     size_t blockSize = 0;
 
-    DDB_TRACE_PRINT_FUNCTION();
     DDB_ASSERT(headPtr && colPtr, "null pointer argument");
 
     headPtr->numColumns = cols;
@@ -25,9 +26,25 @@ void Ddb_UpdateFileHeader(DDB_FileHeader* headPtr, const DDB_ColumnHeader* colPt
 
     headPtr->blockSize = blockSize;
     headPtr->offset    = sizeof(DDB_FileHeader) + blockSize;
+}
 
-    DDB_TRACE_PRINTF("record size: %u bytes\noffset of first record: %u\n",
-        headPtr->blockSize, headPtr->offset);
+DDB_Record* Ddb_NewRecordStruct(DDB_FileHeader* headPtr)
+{
+    DDB_Record* result;
+    size_t blockSize, structSize;
 
-    DDB_TRACE_PRINTF("number of columns: %u\n", headPtr->numColumns);
+    DDB_ASSERT(headPtr, "null pointer argument");
+
+    /* Size of record. */
+    blockSize = headPtr->blockSize;
+    structSize = sizeof(DDB_Record) + blockSize;
+
+    /* Initialize data to zero. */
+    result = ckalloc(structSize);
+    result->structSize = structSize;
+    result->blockSize  = blockSize;
+    result->deleted    = 0;
+    memset(result->data, 0, blockSize);
+
+    return result;
 }

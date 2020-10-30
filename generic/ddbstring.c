@@ -98,6 +98,16 @@ void Ddb_AppendString(DString* ptr, const char* str)
     }
 }
 
+void Ddb_CopyString(DString* dst, const char* src, int maxlen)
+{
+    DDB_ASSERT(dst, "Invalid 'ptr' argument");
+
+    if (maxlen < 0)
+        strcpy(dst->ptr, src);
+    else if (maxlen > 0)
+        strncpy(dst->ptr, src, maxlen);
+}
+
 void Ddb_FreeString(DString* ptr)
 {
     DDB_ASSERT(ptr, "Invalid 'ptr' argument");

@@ -3,31 +3,12 @@
 
 package require jdebug
 
-#load [file join [pwd] "libddb.so"]
+load [file join [pwd] "libddb.so"]
 #load [file join [file join [pwd] scripts] "ddbblock.tcl"]
 
-package require ddbblock
+#package require ddb
 
 jdebug::on
-
-proc _linsert {listVar index args} {
-    upvar $listVar Var
-    set Var [linsert $Var $index {*}$args]
-}
-
-# Unsets a list of variables without the risk of errors
-proc _unset args {
-    set command {
-        if {[info exists $var]} {
-            jdebug::print "delete $var"
-            unset $var
-        }
-    }
-
-    foreach var $args {
-        uplevel [subst -nocommands $command]
-    }
-}
 
 # Execute a list of commands
 proc execCmdList cmdList {

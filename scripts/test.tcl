@@ -2,10 +2,10 @@
 load "./libddb.so"
 
 set fileheader [ddb init]
-set colheader [ddb columns $fileheader {{Name 30 S} {Element 1 S}}]
+set colheader [ddb columns $fileheader {{Name 30 S} {Element 10 S}}]
 
-puts "File header"
-ddb print $fileheader
-
-puts "\nColumns"
 ddb print $colheader
+
+set records [ddb records $fileheader $colheader {Angie Lightning} {Loyla Darkness}]
+
+ddb print $records $colheader 0

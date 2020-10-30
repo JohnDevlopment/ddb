@@ -46,8 +46,6 @@ int Ddb_Init(Tcl_Interp* interp)
     DDB_TRACE_PRINTF("Tcl version %s; load module ddb. Command is ddb. 'ddb list' for a list of subcommands.\n",
         tclVersion);
 
-    DDB_TRACE_PRINTF("Size of DDB_FileHeader: %lu\n", sizeof(DDB_FileHeader));
-
     Tcl_PkgProvide(interp, "ddb", "0.2");
 
     return TCL_OK;
@@ -89,6 +87,9 @@ int DdbCommand_Ddb(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const o
 
         case 0x31102a0912: /* "print" */
             return DDB_JUMP_SUBCOMMAND(Ddb, Print);
+
+        case 0xD0B63E05FD17: /* "records" */
+            return DDB_JUMP_SUBCOMMAND(Ddb, Records);
 
         default:
         {

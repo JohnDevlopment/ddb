@@ -5,7 +5,69 @@
 #include "ddbblock_type.h"
 #include "memory.h"
 
+#include <alloca.h>
 #include <stdbool.h>
+
+enum ValueCopyType { COPY_INT = 'I', COPY_DOUBLE = 'D', COPY_STRING = 'S' };
+
+static const size_t ColumnNameMemberLength = DDB_SIZEOF_MEMBER(DDB_ColumnHeader, name);
+
+static void PrintFormattedString(const char* prefix, const char* str, int type)
+{
+    DDB_ASSERT(prefix && *prefix != '\0', "invalid string argument 1\n");
+    DDB_ASSERT(str && *str != '\0', "invalid string argument 2\n");
+
+    switch (type)
+    {
+        case COPY_INT:
+        {
+            const int* temp_ptr = (const int*) str;
+            printf("%s: %d\n  ", prefix, *temp_ptr);
+            break;
+        }
+
+        case COPY_DOUBLE:
+        {
+            const double* temp_ptr = (const double*) str;
+            printf("%s: %f\n  ", prefix, *temp_ptr);
+            break;
+        }
+
+        case COPY_STRING:
+            printf("%s: %s\n  ", prefix, str);
+            break;
+    }
+}
+
+static char* CopyValueToBuffer(char* dataPtr, int length, Tcl_Obj* objPtr, int type)
+{
+    int temp_int;
+    double temp_double;
+    void* copyBuffer = NULL;
+    unsigned char ucType = (unsigned char) type;
+
+    switch (ucType)
+    {
+        case COPY_INT:
+            if (Tcl_GetIntFromObj(NULL, objPtr, &temp_int) == TCL_OK)
+                copyBuffer = &temp_int;
+            break;
+
+        case COPY_DOUBLE:
+            if (Tcl_GetDoubleFromObj(NULL, objPtr, &temp_double) == TCL_OK)
+                copyBuffer = &temp_double;
+            break;
+
+        case COPY_STRING:
+            copyBuffer = Tcl_GetStringFromObj(objPtr, NULL);
+            break;
+    }
+
+    DDB_ASSERT(copyBuffer, "copyBuffer is NULL\n");
+    memcpy(dataPtr, copyBuffer, (size_t) length);
+
+    return dataPtr + length;
+}
 
 static int CheckObjectType(register Tcl_Obj* objPtr, enum DdbBlockType prefType)
 {
@@ -100,7 +162,6 @@ int DdbSubcommand_Init(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* con
     DDB_ASSERT(result->typePtr, "type pointer NULL");
     Tcl_InvalidateStringRep(result);
     Tcl_SetObjResult(interp, result);
-    DDB_TRACE_PRINTF("result->refCount = %d\n", result->refCount);
 
     return TCL_OK;
 }
@@ -147,7 +208,7 @@ int DdbSubcommand_Columns(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* 
     BLOCK_INT_REP(result).value = DDB_PACK_DWORD(length, DDB_COLUMN_HEADER);
 
     result->typePtr = Ddb_GetObjType();
-    DDB_ASSERT(result->typePtr, "null type pointer\n");
+    DDB_ASSERT(result->typePtr, "NULL type pointer\n");
     Tcl_IncrRefCount(result);
 
     /* Extract elements from list argument. */
@@ -167,7 +228,7 @@ int DdbSubcommand_Columns(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* 
             return TCL_ERROR;
         }
 
-        strncpy(columns[i].name, Tcl_GetStringFromObj(subelements[i], NULL), sizeof(columns[i].name));
+        strncpy(columns[i].name, Tcl_GetStringFromObj(subelements[0], NULL), sizeof(columns[i].name));
         {
             int temp_int;
             const char* temp_str = Tcl_GetStringFromObj(subelements[2], NULL);
@@ -195,17 +256,52 @@ int DdbSubcommand_Columns(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* 
 int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
 {
     DDB_DWord ddbTypeValue;
+    DDB_ColumnHeader* colheader;
+    int index = -1;
+    char isRecord = CheckObjectType(objv[0], DDB_RECORD);
 
-    if (objc != 1)
+    if (objc != 1 && objc != 3)
     {
-        DDB_SUBCOMMAND_WRONG_ARGS("ddb print val");
+        DDB_SUBCOMMAND_WRONG_ARGS("val ?columnHeader index?");
         return TCL_ERROR;
     }
 
-    if (! CheckObjectType(objv[0], DDB_ANY))
+    /* If first argument is a record, three arguments are required. */
+    if (isRecord && objc == 1)
     {
-        DDB_SET_STRING_RESULT(interp, "first argument is not a valid ddb block");
+        DDB_SUBCOMMAND_WRONG_ARGS("record columnHeader index");
         return TCL_ERROR;
+    }
+
+    /* Accept column header and index. */
+    if (objc == 3)
+    {
+        if (Tcl_GetIntFromObj(interp, objv[2], &index) != TCL_OK)
+            return TCL_ERROR;
+
+        /* First argument must be a record. */
+        if (! isRecord)
+        {
+            DDB_SET_STRING_RESULT(interp, "first argument is not a DDB record block");
+            return TCL_ERROR;
+        }
+
+        /* Second argument, if provided, must be a column header */
+        if (! CheckObjectType(objv[1], DDB_COLUMN_HEADER))
+        {
+            DDB_SET_STRING_RESULT(interp, "second argument is not a ddb column header");
+            return TCL_ERROR;
+        }
+        colheader = BLOCK_INT_PTR(DDB_ColumnHeader*, objv[1]);
+    }
+    else
+    {
+        /* Check that first argument is a valid DDB block */
+        if (! CheckObjectType(objv[0], DDB_ANY))
+        {
+            DDB_SET_STRING_RESULT(interp, "first argument is not a DDB block");
+            return TCL_ERROR;
+        }
     }
 
     DDB_UNPACK_DWORD(ddbTypeValue, BLOCK_INT_REP(objv[0]).value);
@@ -214,7 +310,7 @@ int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* co
     {
         case DDB_FILE_HEADER:
         {
-            DDB_FileHeader* temp_ptr = (DDB_FileHeader*) BLOCK_INT_REP(objv[0]).ptr;
+            DDB_FileHeader* temp_ptr = BLOCK_INT_PTR(DDB_FileHeader*, objv[0]);
             printf("number of entries: %u\nblock size: %u\nnumber of columns: %u\n",
                 temp_ptr->numEntries, temp_ptr->blockSize, temp_ptr->numColumns);
             printf("offset to first entry: %u\n", temp_ptr->offset);
@@ -223,14 +319,57 @@ int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* co
 
         case DDB_COLUMN_HEADER:
         {
-            DDB_ColumnHeader* temp_ptr = (DDB_ColumnHeader*) BLOCK_INT_REP(objv[0]).ptr;
+            DDB_ColumnHeader* temp_ptr = BLOCK_INT_PTR(DDB_ColumnHeader*, objv[0]);
             char buffer[50];
             for (uint16_t i = 0; i < ddbTypeValue.hi; ++i)
             {
                 strcpy(buffer, temp_ptr[i].name);
-                printf("column %u\nname: %s\nlength: %u bytes\ntype: %c\n\n",
+                printf("column %u\n  name: %s\n  length: %u bytes\n  type: %c\n\n",
                     i, buffer, temp_ptr[i].length, temp_ptr[i].type);
             }
+            break;
+        }
+
+        case DDB_RECORD:
+        {
+            const char* recordData;
+            const uint16_t numColumns = DDB_HIWORD(BLOCK_INT_REP(objv[1]).value);
+            DString* buffer = Ddb_AllocString(NULL, 50);
+
+            if (index < 0 || index >= (int) ddbTypeValue.hi)
+            {
+                DDB_PRINTF_RESULT(interp, "invalid index %d", index);
+                return TCL_ERROR;
+            }
+
+            /* Get a pointer to the record data. */
+            {
+                DDB_Record* temp_record =
+                    DDB_STATIC_CAST(DDB_Record**, BLOCK_INT_REP(objv[0]).ptr)[index];
+                recordData = temp_record->data;
+            }
+
+            printf("record %d\n  ", index);
+            for (uint16_t i = 0; i < numColumns; ++i)
+            {
+                char colname[ColumnNameMemberLength + 1];
+                /* Copy column name to buffer. */
+                strncpy(colname, colheader->name, ColumnNameMemberLength);
+
+                /* Copy column data to dynamic string buffer. */
+                buffer = Ddb_AllocStringIfNeeded(buffer, colheader->length);
+                Ddb_CopyString(buffer, recordData, colheader->length);
+
+                /* Print buffer to string in specific format according to field type. */
+                PrintFormattedString(colname, buffer->ptr, colheader->type);
+
+                /* Advance string pointer. */
+                recordData += colheader->length;
+            }
+            printf("end of record\n");
+
+            Ddb_FreeString(buffer);
+
             break;
         }
 
@@ -240,4 +379,103 @@ int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* co
     }
 
     return TCL_OK;
+}
+
+int DdbSubcommand_Records(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
+{
+    const int listCount = objc - 2;
+    int code = TCL_OK;
+    DDB_FileHeader* fileHeader;
+    DDB_Record** records;
+    Tcl_Obj* result;
+    Tcl_Obj* const* curArg;
+
+    if (objc < 3)
+    {
+        DDB_SUBCOMMAND_WRONG_ARGS("fileHeader columnHeaders record ?record ...?");
+        return TCL_ERROR;
+    }
+
+    /* Check arguments 1 and 2 on whether they're the correct type. */
+    if (! CheckObjectType(objv[0], DDB_FILE_HEADER))
+    {
+        DDB_PRINTF_RESULT(interp, "\"%s\" is not a valid file header",
+            Tcl_GetStringFromObj(objv[0], NULL));
+        return TCL_ERROR;
+    }
+    if (! CheckObjectType(objv[1], DDB_COLUMN_HEADER))
+    {
+        DDB_PRINTF_RESULT(interp, "\"%s\" is not a valid column header",
+            Tcl_GetStringFromObj(objv[1], NULL));
+        return TCL_ERROR;
+    }
+
+    /* Retrieve file header. */
+    fileHeader = (DDB_FileHeader*) BLOCK_INT_REP(objv[0]).ptr;
+    DDB_ASSERT(fileHeader, "NULL pointer\n");
+
+    /* RECORDS is a pointer to an array of pointers, each holding an individual record. */
+    records = DDB_ALLOC(DDB_Record*, DDB_STATIC_CAST(size_t, listCount));
+
+    /* Wrap RECORD in Tcl object and initialize. */
+    result = Tcl_NewObj();
+    Tcl_IncrRefCount(result);
+    result->typePtr             = Ddb_GetObjType();
+    BLOCK_INT_REP(result).ptr   = (void*) records;
+    BLOCK_INT_REP(result).value = DDB_PACK_DWORD(listCount, DDB_RECORD);
+
+    /* Fill the records with their corresponding data in the list argument. */
+    curArg = objv + 2;
+
+    for (int i = 0; i < listCount; ++i)
+    {
+        const uint32_t numColumns = fileHeader->numColumns;
+        Tcl_Obj** elements;
+        DDB_Record* temp_record;
+        char* dataPtr;
+
+        /* Break argument down into a list. */
+        {
+            int length;
+            code = Tcl_ListObjGetElements(interp, *curArg++, &length, &elements);
+            if (code != TCL_OK) /* Failed to construct list from string. */
+                break;
+
+            /* List does not include all the column fields. */
+            if ((size_t) length < numColumns)
+            {
+                DDB_PRINTF_RESULT(interp, "arg %d is %d length, should be %d\n",
+                    i + 4, length, (int) numColumns);
+                code = TCL_ERROR;
+                break;
+            }
+        }
+
+        /* Copy arguments to data buffer. */
+        temp_record = Ddb_NewRecordStruct(fileHeader);
+        dataPtr = temp_record->data;
+        for (uint32_t ii = 0; ii < numColumns; ++ii)
+        {
+            DDB_ColumnHeader* currentColumn =
+                DDB_STATIC_CAST(DDB_ColumnHeader*, BLOCK_INT_REP(objv[1]).ptr) + ii;
+            dataPtr = CopyValueToBuffer(dataPtr, currentColumn->length, *elements++,
+                currentColumn->type);
+        }
+
+        records[i] = temp_record; /* Save to array. */
+    }
+
+    /* Update number of entries. */
+    fileHeader->numEntries = listCount;
+
+    /* Set as result of function. */
+    if (code == TCL_OK)
+    {
+        Tcl_InvalidateStringRep(result);
+        Tcl_SetObjResult(interp, result);
+    }
+
+    Tcl_DecrRefCount(result);
+
+    return code;
 }

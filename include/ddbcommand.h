@@ -15,4 +15,7 @@ int DdbSubcommand_Columns(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* 
 /* Tcl command "ddb print". */
 int DdbSubcommand_Print(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
 
+/* Tcl command "ddb records". */
+int DdbSubcommand_Records(ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
+
 #endif /* DDBCOMMAND_H */

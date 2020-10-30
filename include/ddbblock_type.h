@@ -20,6 +20,14 @@ BLOCK_INT_REP - References the internal represenation DDB type Tcl value
 */
 #define BLOCK_INT_REP(objPtr) objPtr->internalRep.ptrAndLongRep
 
+/* Retrieves the internal pointer representation of OBJPTR and casts it to TYPE. */
+#define BLOCK_INT_PTR(type, objPtr) \
+    DDB_STATIC_CAST(type, BLOCK_INT_REP(objPtr).ptr)
+
+/* Retrieves the internal long-value representation of OBJPTR and casts it to TYPE. */
+#define BLOCK_INT_VALUE(type, objPtr) \
+    DDB_STATIC_CAST(type, BLOCK_INT_REP(objPtr).value)
+
 void DdbBlock_DupIntRepProc(Tcl_Obj* srcPtr, Tcl_Obj* dupPtr);
 void DdbBlock_FreeInternalRepProc(Tcl_Obj* objPtr);
 void DdbBlock_StringUpdateProc(Tcl_Obj* objPtr);
